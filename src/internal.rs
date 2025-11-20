@@ -25,6 +25,8 @@ use alloc::collections::BTreeMap;
 use core::mem;
 use core::mem::offset_of;
 use core::ops::Not;
+#[cfg(feature = "defmt")]
+use defmt::trace;
 
 /// Maximum Key length is 15 bytes + 1 byte for the null terminator.
 /// Shorter keys need to be padded with null bytes.
@@ -150,8 +152,12 @@ impl ThinPage {
         hal: &mut T,
         next_sequence: u32,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("initialize: @{:#08x}", self.address);
+
         #[cfg(feature = "debug-logs")]
         println!("  ThinPage: initialize");
+
         let mut raw_header = PageHeader {
             state: PageState::Active as u32,
             sequence: next_sequence,
@@ -178,6 +184,9 @@ impl ThinPage {
     }
 
     pub(crate) fn mark_as_full<T: Platform>(&mut self, hal: &mut T) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("mark_as_full: @{:#08x}", self.address);
+
         let raw = (PageState::Full as u32).to_le_bytes();
         hal.write(self.address as u32, &raw)
             .map_err(|_| Error::FlashError)?;
@@ -192,6 +201,9 @@ impl ThinPage {
         hal: &mut T,
         item_index: u8,
     ) -> Result<Item, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("load_item: @{:#08x}[{}]", self.address, item_index);
+
         let mut buf = [0u8; size_of::<Item>()];
         hal.read(
             (self.address + offset_of!(RawPage, items) + size_of::<Item>() * item_index as usize)
@@ -227,9 +239,6 @@ impl ThinPage {
         span: u8,
         item_data: ItemData,
     ) -> Result<(), Error> {
-        #[cfg(feature = "debug-logs")]
-        println!("internal: write_item");
-
         let mut item = Item {
             namespace_index,
             type_,
@@ -245,8 +254,12 @@ impl ThinPage {
         let target_addr =
             self.address + offset_of!(RawPage, items) + size_of::<Item>() * item_index;
 
+        #[cfg(feature = "defmt")]
+        trace!("load_item: @{:#08x}[{}]", self.address, item_index);
+
         #[cfg(feature = "debug-logs")]
         println!("  internal: write_item: target_addr: 0x{target_addr:0>8x}");
+
         let raw_item = RawItem { item };
         hal.write(target_addr as _, unsafe { &raw_item.raw })
             .map_err(|_| Error::FlashError)?;
@@ -277,6 +290,9 @@ impl ThinPage {
         key: Key,
         value: u8,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("write_namespace: @{:#08x}", self.address);
+
         let mut buf = [u8::MAX; 8];
         buf[..1].copy_from_slice(&value.to_le_bytes());
         self.write_item::<T>(hal, 0, key, ItemType::U8, None, 1, ItemData { raw: buf })
@@ -326,6 +342,14 @@ impl ThinPage {
         };
         item.crc = item.calculate_crc32(T::crc32);
 
+        #[cfg(feature = "defmt")]
+        trace!(
+            "write_variable_sized_item: @{:#08x}[{}-{}]",
+            self.address,
+            start_index,
+            start_index + span - 1
+        );
+
         // Write the header entry
         let header_addr =
             self.address + offset_of!(RawPage, items) + size_of::<Item>() * start_index;
@@ -363,6 +387,14 @@ impl ThinPage {
         item_index: u8,
         item: &Item,
     ) -> Result<Vec<u8>, Error> {
+        #[cfg(feature = "defmt")]
+        trace!(
+            "load_referenced_data: @{:#08x}[{}-{}]",
+            self.address,
+            item_index + 1,
+            item_index + item.span
+        );
+
         #[cfg(feature = "debug-logs")]
         println!("internal: load_item_data");
 
@@ -395,6 +427,12 @@ impl ThinPage {
         item_index: usize,
         state: EntryMapState,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!(
+            "set_entry_state: @{:#08x}[{}]: {}",
+            self.address, item_index, state
+        );
+
         #[cfg(feature = "debug-logs")]
         println!("internal: set_entry_state");
 
@@ -402,6 +440,9 @@ impl ThinPage {
     }
 
     fn get_entry_state(&self, item_index: u8) -> EntryMapState {
+        #[cfg(feature = "defmt")]
+        trace!("get_entry_state: @{:#08x}[{}]", self.address, item_index);
+
         #[cfg(feature = "debug-logs")]
         println!("internal: get_item_state");
 
@@ -418,6 +459,12 @@ impl ThinPage {
         indices: Range<u8>,
         state: EntryMapState,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!(
+            "set_entry_state_range: @{:#08x}[{}-{}]: {}",
+            self.address, indices.start, indices.end, state
+        );
+
         let raw_state = state as u8;
         for item_index in indices.clone() {
             let mask = 0b11u8 << ((item_index % 4) * 2);
@@ -487,6 +534,14 @@ impl ThinPage {
         item_index: u8,
         span: u8,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!(
+            "erase_item: @{:#08x}[{}-{}]",
+            self.address,
+            item_index,
+            item_index + span
+        );
+
         #[cfg(feature = "debug-logs")]
         println!("internal: erase_item");
 
@@ -619,6 +674,9 @@ where
         key: &Key,
         type_: ItemType,
     ) -> Result<u64, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("get_primitive");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: get_primitive");
 
@@ -643,6 +701,9 @@ where
     }
 
     pub(crate) fn get_string(&mut self, namespace: &Key, key: &Key) -> Result<String, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("get_string");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: get_string");
 
@@ -679,6 +740,9 @@ where
     }
 
     pub(crate) fn get_blob(&mut self, namespace: &Key, key: &Key) -> Result<Vec<u8>, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("get_blob");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: get_blob");
 
@@ -748,6 +812,9 @@ where
         key: &Key,
         chunk_index: ChunkIndex,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("delete_key");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: delete_key");
 
@@ -774,6 +841,9 @@ where
         key: &Key,
         chunk_start: VersionOffset,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("delete_blob_data");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: delete_blob_data");
 
@@ -804,6 +874,9 @@ where
         blob_item: &Item,
         data: &[u8],
     ) -> Result<bool, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("blob_is_equal");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: blob_is_equal");
 
@@ -849,6 +922,9 @@ where
     }
 
     fn find_existing_blob_version(&mut self, namespace: &Key, key: &Key) -> Option<VersionOffset> {
+        #[cfg(feature = "defmt")]
+        trace!("find_existing_blob_version");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: find_existing_blob_version");
 
@@ -879,6 +955,9 @@ where
         type_: ItemType,
         value: u64,
     ) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("set_primitive");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: set_primitive");
 
@@ -950,6 +1029,9 @@ where
     }
 
     pub(crate) fn set_str(&mut self, namespace: &Key, key: Key, value: &str) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("set_str");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: set_str");
 
@@ -1034,6 +1116,9 @@ where
     }
 
     pub(crate) fn set_blob(&mut self, namespace: &Key, key: Key, data: &[u8]) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("set_blob");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: set_blob");
 
@@ -1151,6 +1236,9 @@ where
     }
 
     pub(crate) fn get_active_page(&mut self) -> Result<ThinPage, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("get_active_page");
+
         let page = self
             .pages
             .pop_if(|page| page.header.state == ThinPageState::Active);
@@ -1205,6 +1293,9 @@ where
         namespace: &Key,
         page: &mut ThinPage,
     ) -> Result<u8, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("get_or_create_namespace");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: get_or_create_namespace");
 
@@ -1234,6 +1325,9 @@ where
         chunk_index: ChunkIndex,
         key: &Key,
     ) -> Result<(PageIndex, ItemIndex, Item), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("load_item");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: load_item");
 
@@ -1269,6 +1363,9 @@ where
     }
 
     pub(crate) fn load_sectors(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("load_sectors");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: load_sectors");
 
@@ -1316,6 +1413,9 @@ where
     }
 
     fn cleanup_dirty_blobs(&mut self, mut blob_index: BlobIndex) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("cleanup_dirty_blobs");
+
         while let Some(((namespace_index, chunk_start, key), (index, observed))) =
             blob_index.pop_first()
         {
@@ -1381,6 +1481,9 @@ where
     }
 
     fn continue_free_page(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("continue_free_page");
+
         let source_page = match self
             .pages
             .iter()
@@ -1419,6 +1522,9 @@ where
     /// This handles the write-before-delete scenario where deletion failed after successful write.
     /// IMPORTANT: This does NOT touch blob entries - they have their own cleanup logic.
     fn cleanup_duplicate_entries(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("cleanup_duplicate_entries");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: cleanup_duplicate_entries");
 
@@ -1495,6 +1601,9 @@ where
 
     /// Try to find and reclaim pages that can be recycled
     fn defragment(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("defragment");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: defragment");
 
@@ -1545,6 +1654,9 @@ where
 
     /// Quickly reclaim a page that has no valid entries
     fn erase_page(&mut self, page: ThinPage) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("erase_page");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: erase_page");
 
@@ -1559,6 +1671,9 @@ where
     }
 
     fn free_page(&mut self, source: &ThinPage, next_sequence: u32) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("free_page");
+
         #[cfg(feature = "debug-logs")]
         println!("internal: copy_entries_to_reserve_page");
 
@@ -1590,6 +1705,9 @@ where
     }
 
     fn copy_items(&mut self, source: &ThinPage, mut target: ThinPage) -> Result<(), Error> {
+        #[cfg(feature = "defmt")]
+        trace!("copy_items");
+
         // in case the operation was disturbed in the middle, target might already contain some parts
         // of the source page, so we first get the last copied item so we can ignor it and everything
         // before in our copy loop
@@ -1676,6 +1794,9 @@ where
     }
 
     fn load_sector(&mut self, sector_address: usize) -> Result<LoadPageResult, Error> {
+        #[cfg(feature = "defmt")]
+        trace!("load_sector: @{:#08x}", sector_address);
+
         #[cfg(feature = "debug-logs")]
         println!("  raw: load page: 0x{sector_address:04X}");
 

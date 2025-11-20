@@ -47,6 +47,7 @@ impl Debug for Items {
 }
 
 #[derive(strum::FromRepr, Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub(crate) enum EntryMapState {
     Empty = 0b11,
