@@ -1,7 +1,7 @@
 use crate::common::Operation::{Read, Write};
 use crate::common::{
     ENTRY_STATE_MAP_ENTRY_SIZE, ENTRY_STATE_MAP_OFFSET, FLASH_SECTOR_SIZE, ITEM_OFFSET, ITEM_SIZE,
-    PAGE_HEADER_SIZE,
+    PAGE_HEADER_SIZE, WORD_SIZE,
 };
 use esp_nvs::Key;
 
@@ -37,7 +37,7 @@ fn single_primitve() {
         },
         Write {
             offset: ENTRY_STATE_MAP_OFFSET as _,
-            len: ENTRY_STATE_MAP_ENTRY_SIZE,
+            len: WORD_SIZE,
         },
         Write {
             offset: (ITEM_OFFSET + 1 * ITEM_SIZE) as _,
@@ -45,7 +45,7 @@ fn single_primitve() {
         },
         Write {
             offset: ENTRY_STATE_MAP_OFFSET as _,
-            len: ENTRY_STATE_MAP_ENTRY_SIZE,
+            len: WORD_SIZE,
         },
     ];
 

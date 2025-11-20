@@ -5,7 +5,7 @@ use crate::raw::slice_with_nullbytes_to_str;
 use crate::raw::{
     ENTRIES_PER_PAGE, ENTRY_STATE_BITMAP_SIZE, EntryMapState, FLASH_SECTOR_SIZE, Item, ItemData,
     ItemDataBlobIndex, ItemType, MAX_BLOB_DATA_PER_PAGE, MAX_BLOB_SIZE, PageHeader, PageHeaderRaw,
-    PageState, RawItem, RawPage,
+    PageState, RawItem, RawPage, write_aligned,
 };
 use crate::u24::u24;
 use crate::{Nvs, raw};
@@ -20,7 +20,7 @@ use core::mem::size_of;
 use core::ops::Range;
 
 use crate::error::Error::{ItemTypeMismatch, KeyNotFound, PageFull};
-use crate::platform::Platform;
+use crate::platform::{AlignedOps, Platform};
 use alloc::collections::BTreeMap;
 use core::mem;
 use core::mem::offset_of;
@@ -172,7 +172,7 @@ impl ThinPage {
             page_header: raw_header,
         };
 
-        hal.write(self.address as u32, unsafe { &raw_header.raw })
+        write_aligned::<T>(hal, self.address as u32, unsafe { &raw_header.raw })
             .map_err(|_| Error::FlashError)?;
 
         self.header.state = ThinPageState::Active;
@@ -188,8 +188,8 @@ impl ThinPage {
         trace!("mark_as_full: @{:#08x}", self.address);
 
         let raw = (PageState::Full as u32).to_le_bytes();
-        hal.write(self.address as u32, &raw)
-            .map_err(|_| Error::FlashError)?;
+
+        write_aligned(hal, self.address as u32, &raw).map_err(|_| Error::FlashError)?;
 
         self.header.state = ThinPageState::Full;
 
@@ -261,7 +261,7 @@ impl ThinPage {
         println!("  internal: write_item: target_addr: 0x{target_addr:0>8x}");
 
         let raw_item = RawItem { item };
-        hal.write(target_addr as _, unsafe { &raw_item.raw })
+        write_aligned(hal, target_addr as _, unsafe { &raw_item.raw })
             .map_err(|_| Error::FlashError)?;
 
         self.set_entry_state(hal, item_index, EntryMapState::Written)?;
@@ -354,12 +354,12 @@ impl ThinPage {
         let header_addr =
             self.address + offset_of!(RawPage, items) + size_of::<Item>() * start_index;
         let raw_item = RawItem { item };
-        hal.write(header_addr as _, unsafe { &raw_item.raw })
+
+        write_aligned(hal, header_addr as _, unsafe { &raw_item.raw })
             .map_err(|_| Error::FlashError)?;
 
         let data_addr = header_addr + size_of::<Item>();
-        hal.write(data_addr as _, data)
-            .map_err(|_| Error::FlashError)?;
+        write_aligned(hal, data_addr as _, data).map_err(|_| Error::FlashError)?;
 
         self.set_entry_state_range(
             hal,
@@ -404,11 +404,12 @@ impl ThinPage {
         }
 
         let size = unsafe { item.data.sized.size } as usize;
+        let aligned_size = T::align_read(size);
 
-        let mut buf = Vec::with_capacity(size);
+        let mut buf = Vec::with_capacity(aligned_size);
         // Safety: we just allocated the buffer with the exact size we need and we will override it the the call to hal.read()
         unsafe {
-            Vec::set_len(&mut buf, size);
+            Vec::set_len(&mut buf, aligned_size);
         }
         hal.read(
             (self.address
@@ -417,6 +418,11 @@ impl ThinPage {
             &mut buf,
         )
         .map_err(|_| Error::FlashError)?;
+
+        // Safety: we allocated aligned_size bytes which is always more than size
+        unsafe {
+            Vec::set_len(&mut buf, size);
+        }
 
         Ok(buf)
     }
@@ -478,8 +484,12 @@ impl ThinPage {
         let start_byte = (indices.start / 4) as usize;
         let end_byte = ((indices.end - 1) / 4) as usize;
 
+        let aligned_start_byte = T::align_write_floor(start_byte);
+        let aligned_end_byte = T::align_write_ceil(end_byte + 1);
+
         let offset_in_raw_flash =
             self.address + offset_of!(RawPage, entry_state_bitmap) + start_byte;
+        let aligned_offset_in_raw_flash = T::align_write_floor(offset_in_raw_flash) as _;
 
         #[cfg(feature = "debug-logs")]
         println!(
@@ -487,9 +497,10 @@ impl ThinPage {
             indices.start, indices.end
         );
 
-        hal.write(
-            offset_in_raw_flash as _,
-            &self.entry_state_bitmap[start_byte..=end_byte],
+        write_aligned(
+            hal,
+            aligned_offset_in_raw_flash,
+            &self.entry_state_bitmap[aligned_start_byte..aligned_end_byte],
         )
         .map_err(|_| Error::FlashError)
     }
@@ -1679,9 +1690,7 @@ where
 
         // Mark source page as FREEING
         let raw = (PageState::Freeing as u32).to_le_bytes();
-        self.hal
-            .write(source.address as u32, &raw)
-            .map_err(|_| Error::FlashError)?;
+        write_aligned(self.hal, source.address as u32, &raw).map_err(|_| Error::FlashError)?;
 
         // TODO: Check if the active page has still some space left, e.g. this might happen if we
         //  wanted to write a string that can't be split over multiple pages or a chunk of blob_data

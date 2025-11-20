@@ -1,14 +1,16 @@
-#[cfg(feature = "debug-logs")]
-use alloc::format;
-use core::fmt::{Debug, Formatter};
-use core::mem::{size_of, transmute};
-use core::slice::from_raw_parts;
-
 use crate::Key;
 use crate::error::Error;
 use crate::internal::{ThinPageHeader, ThinPageState, VersionOffset};
-use crate::platform::FnCrc32;
+use crate::platform::{AlignedOps, FnCrc32, Platform};
 use crate::u24::u24;
+#[cfg(feature = "debug-logs")]
+use alloc::format;
+use alloc::vec;
+use core::fmt::{Debug, Formatter};
+use core::mem::{size_of, transmute};
+use core::slice::from_raw_parts;
+#[cfg(feature = "defmt")]
+use defmt::trace;
 
 // -1 is for the leading item of type BLOB_DATA or SZ (for str)
 pub(crate) const MAX_BLOB_DATA_PER_PAGE: usize = (ENTRIES_PER_PAGE - 1) * size_of::<Item>();
@@ -366,4 +368,32 @@ pub(crate) fn slice_with_nullbytes_to_str(raw: &[u8]) -> &str {
         Some(idx) => &raw[..idx],
     };
     unsafe { core::str::from_utf8_unchecked(sliced) }
+}
+
+#[inline(always)]
+pub(crate) fn write_aligned<T: Platform>(
+    hal: &mut T,
+    offset: u32,
+    bytes: &[u8],
+) -> Result<(), T::Error> {
+    #[cfg(feature = "defmt")]
+    trace!("write_aligned @{:#08x}: [{}]", offset, bytes.len());
+
+    if bytes.len().is_multiple_of(T::WRITE_SIZE) {
+        hal.write(offset, bytes)
+    } else {
+        let pivot = T::align_write_floor(bytes.len());
+        let header = &bytes[..pivot];
+        let trailer = &bytes[pivot..];
+        hal.write(offset, header)?;
+
+        // no need to write the trailer if remaining data is all ones - this the default state of the flash
+        if bytes[pivot..].iter().any(|&e| e != 0xFF) {
+            let mut buf = vec![0xFFu8; T::WRITE_SIZE];
+            buf[..trailer.len()].copy_from_slice(trailer);
+            hal.write(offset + (pivot as u32), &buf)?
+        }
+
+        Ok(())
+    }
 }

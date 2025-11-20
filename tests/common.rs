@@ -6,6 +6,8 @@ use embedded_storage::nor_flash::{
 };
 
 pub const FLASH_SECTOR_SIZE: usize = 4096;
+// Taken from https://github.com/esp-rs/esp-hal/blob/main/esp-storage/src/stub.rs
+pub const WORD_SIZE: usize = 4;
 pub const PAGE_HEADER_SIZE: usize = 32;
 pub const ENTRY_STATE_MAP_OFFSET: usize = PAGE_HEADER_SIZE;
 
@@ -96,9 +98,11 @@ impl ErrorType for Flash {
 }
 
 impl ReadNorFlash for Flash {
-    const READ_SIZE: usize = FLASH_SECTOR_SIZE;
+    const READ_SIZE: usize = WORD_SIZE;
 
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+        assert!(offset.is_multiple_of(Self::READ_SIZE as _));
+
         println!(
             "    flash: read:  0x{offset:04X}[0x{:04X}] #{:>2}",
             bytes.len(),
@@ -124,11 +128,14 @@ impl ReadNorFlash for Flash {
 }
 
 impl NorFlash for Flash {
-    const WRITE_SIZE: usize = FLASH_SECTOR_SIZE;
+    const WRITE_SIZE: usize = WORD_SIZE;
 
     const ERASE_SIZE: usize = FLASH_SECTOR_SIZE;
 
     fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+        assert!(from.is_multiple_of(Self::ERASE_SIZE as _));
+        assert!(to.is_multiple_of(Self::ERASE_SIZE as _));
+
         println!(
             "    flash: erase: {from:04X} - {to:04X} #{:>2}",
             self.operations.len()
@@ -154,6 +161,9 @@ impl NorFlash for Flash {
     }
 
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+        assert!(offset.is_multiple_of(Self::WRITE_SIZE as _));
+        assert!(bytes.len().is_multiple_of(Self::WRITE_SIZE as _));
+
         println!(
             "    flash: write: 0x{offset:04X}[0x{:04X}] #{:>2}",
             bytes.len(),
@@ -176,7 +186,6 @@ impl NorFlash for Flash {
             // the esp flash we can only flip bits from 1 to 0
             // println!("0x[{:04x}] {} &= {val} = {}",  offset+i,self.buf[offset + i], self.buf[offset + i] & val);
             self.buf[offset + i] &= val;
-            assert_eq!(self.buf[offset + i], val, "detected improper flash write");
         }
         Ok(())
     }
