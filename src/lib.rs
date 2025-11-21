@@ -11,11 +11,12 @@ mod u24;
 
 /// Maximum Key length is 15 bytes + 1 byte for the null terminator.
 const MAX_KEY_LENGTH: usize = 15;
+const MAX_KEY_NUL_TERMINATED_LENGTH: usize = MAX_KEY_LENGTH + 1;
 
 /// A 16-byte key used for NVS storage (15 characters + null terminator)
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Key([u8; MAX_KEY_LENGTH + 1]);
+pub struct Key([u8; MAX_KEY_NUL_TERMINATED_LENGTH]);
 
 impl Key {
     /// Creates a 16 byte, null-padded byte array used as key for values and namespaces.
@@ -26,7 +27,7 @@ impl Key {
     ///   `let my_key = const { Key::from_array(b"my_key") };`
     pub const fn from_array<const M: usize>(src: &[u8; M]) -> Self {
         assert!(M <= MAX_KEY_LENGTH);
-        let mut dst = [0u8; MAX_KEY_LENGTH + 1];
+        let mut dst = [0u8; MAX_KEY_NUL_TERMINATED_LENGTH];
         let mut i = 0;
         while i < M {
             dst[i] = src[i];
@@ -43,7 +44,7 @@ impl Key {
     ///   `let my_key = const { Key::from_slice("my_key".as_bytes()) };`
     pub const fn from_slice(src: &[u8]) -> Self {
         assert!(src.len() <= MAX_KEY_LENGTH);
-        let mut dst = [0u8; MAX_KEY_LENGTH + 1];
+        let mut dst = [0u8; MAX_KEY_NUL_TERMINATED_LENGTH];
         let mut i = 0;
         while i < src.len() {
             dst[i] = src[i];
@@ -61,6 +62,17 @@ impl Key {
     pub const fn from_str(s: &str) -> Self {
         let bytes = s.as_bytes();
         Self::from_slice(bytes)
+    }
+
+    /// Converts a key to a byte array.
+    pub const fn as_bytes(&self) -> &[u8; MAX_KEY_NUL_TERMINATED_LENGTH] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Key {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
