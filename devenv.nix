@@ -23,7 +23,7 @@
     channel = "stable";
     version = "1.90.0";
     components = [ "rustc" "rust-src" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
-    targets = [ "x86_64-unknown-linux-gnu" ];
+    targets = [ "x86_64-unknown-linux-gnu" "riscv32imac-unknown-none-elf" "riscv32imc-unknown-none-elf" ];
   };
 
   # https://devenv.sh/processes/
