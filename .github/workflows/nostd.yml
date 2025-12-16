@@ -1,0 +1,58 @@
+permissions:
+  contents: read
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+name: no-std
+jobs:
+  riscv32imc:
+    runs-on: ubuntu-latest
+    name: riscv32imc-unknown-none-elf
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # tag=v6.0.0
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # branch=master
+        with:
+          toolchain: stable
+      - name: rustup target add riscv32imc-unknown-none-elf
+        run: rustup target add riscv32imc-unknown-none-elf
+      - name: cargo check
+        run: cargo check --target riscv32imc-unknown-none-elf --no-default-features
+  riscv32imac:
+    runs-on: ubuntu-latest
+    name: riscv32imac-unknown-none-elf
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # tag=v6.0.0
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e # branch=master
+        with:
+          toolchain: stable
+      - name: rustup target add riscv32imac-unknown-none-elf
+        run: rustup target add riscv32imac-unknown-none-elf
+      - name: cargo check
+        run: cargo check --target riscv32imac-unknown-none-elf --no-default-features
+  xtensa:
+    runs-on: ubuntu-latest
+    name: xtensa-esp32-none-elf
+    env:
+      GITHUB_TOKEN: ${{ secrets. GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # tag=v6.0.0
+        with:
+          submodules: true
+      - name: Install Xtensa toolchain
+        uses: esp-rs/xtensa-toolchain@67649b28a0139171102259d9982f93106aa2b54a # tag=v1.6.0
+        with:
+          default: true
+          version: "latest"
+          buildtargets: "esp32"
+      - name: cargo check
+        run: cargo check --target xtensa-esp32-none-elf --no-default-features -Zbuild-std=core,alloc
