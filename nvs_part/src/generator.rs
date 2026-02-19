@@ -28,6 +28,9 @@ const ITEM_TYPE_SIZED: u8 = 0x21; // For strings
 const ITEM_TYPE_BLOB_INDEX: u8 = 0x48;
 const ITEM_TYPE_BLOB_DATA: u8 = 0x42;
 
+// Reserved value for unused fields
+const RESERVED_U16: u16 = 0xFFFF;
+
 // Entry states
 const ENTRY_STATE_WRITTEN: u8 = 0b10;
 
@@ -340,8 +343,10 @@ fn write_sized_entry(
     write_key(&mut data[key_offset..key_offset + 16], key)?;
 
     let data_offset = entry_offset + 24;
+    // For SIZED entries, max size is 8 bytes (checked by caller)
+    assert!(bytes.len() <= 8, "SIZED entry must be <= 8 bytes");
     data[data_offset..data_offset + 2].copy_from_slice(&(bytes.len() as u16).to_le_bytes());
-    data[data_offset + 2..data_offset + 4].copy_from_slice(&0xFFFFu16.to_le_bytes());
+    data[data_offset + 2..data_offset + 4].copy_from_slice(&RESERVED_U16.to_le_bytes());
     let data_crc = crc32c(bytes);
     data[data_offset + 4..data_offset + 8].copy_from_slice(&data_crc.to_le_bytes());
 
