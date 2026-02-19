@@ -21,4 +21,4 @@ update-changelog:
 
 [working-directory: 'esp-nvs/tests/assets/']
 generate_test_nvs_bin:
-    ../../../target/release/esp-nvs-partition-tool generate test_nvs_data.csv test_nvs_data.bin --size 0x4000
+    esp-nvs-partition-tool generate test_nvs_data.csv test_nvs_data.bin --size 0x4000
