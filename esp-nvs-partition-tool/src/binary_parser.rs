@@ -219,6 +219,14 @@ pub fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
                     // SIZED entries store strings/blobs with data in subsequent entries
                     let size = u16::from_le_bytes([data_field[0], data_field[1]]) as usize;
                     
+                    // Validate span before using it
+                    if span == 0 {
+                        return Err(Error::InvalidValue(format!(
+                            "Invalid span value 0 for SIZED entry at page {}, entry {}",
+                            page_idx, entry_idx
+                        )));
+                    }
+                    
                     // Collect data from subsequent entries based on span
                     let mut string_data = Vec::new();
                     let num_data_entries = (span - 1) as usize; // First entry is the SIZED entry itself
@@ -274,6 +282,14 @@ pub fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
                 ITEM_TYPE_BLOB_DATA => {
                     // Collect blob data chunk
                     let blob_key = (namespace_idx, key.clone());
+                    
+                    // Validate span before using it
+                    if span == 0 {
+                        return Err(Error::InvalidValue(format!(
+                            "Invalid span value 0 for BLOB_DATA entry at page {}, entry {}",
+                            page_idx, entry_idx
+                        )));
+                    }
                     
                     // Collect data from subsequent entries based on span
                     let mut chunk_data = Vec::new();
