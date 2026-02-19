@@ -6,14 +6,12 @@
 
   overlays = [
     (final: prev: {
-      esp-idf-nvs-partition-gen = final.callPackage ./.nix/esp-idf-nvs-partition-gen.nix {};
       esp-nvs-partition-tool = final.callPackage ./.nix/esp-nvs-partition-tool.nix {};
     })
   ];
 
   # https://devenv.sh/packages/
   packages = [
-    pkgs.esp-idf-nvs-partition-gen
     pkgs.esp-nvs-partition-tool
     pkgs.git
     pkgs.just
@@ -33,10 +31,6 @@
 
   # https://devenv.sh/services/
   # services.postgres.enable = true;
-
-  scripts.nvs_partition_gen.exec = ''
-    python3 -m esp_idf_nvs_partition_gen "$@"
-  '';
 
   # https://devenv.sh/scripts/
 #  scripts.hello.exec = ''
