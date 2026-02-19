@@ -583,7 +583,7 @@ fn calculate_entry_crc(entry_data: &[u8]) -> u32 {
     crc32c(&combined)
 }
 
-fn crc32c(data: &[u8]) -> u32 {
+pub(crate) fn crc32c(data: &[u8]) -> u32 {
     // Simple CRC32 implementation (IEEE 802.3 polynomial)
     // ESP-IDF uses hardware CRC32, but for the tool we use software
     let mut crc: u32 = 0xFFFFFFFF;

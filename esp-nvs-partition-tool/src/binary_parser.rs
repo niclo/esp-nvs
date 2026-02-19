@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::generator::crc32c;
 use crate::types::*;
 use std::collections::HashMap;
 use std::fs;
@@ -291,6 +292,11 @@ pub fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
                         )));
                     }
                     
+                    // Read ItemDataSized header from data field (bytes 24-31)
+                    let chunk_size = u16::from_le_bytes([data_field[0], data_field[1]]) as usize;
+                    let _reserved = u16::from_le_bytes([data_field[2], data_field[3]]);
+                    let expected_crc = u32::from_le_bytes([data_field[4], data_field[5], data_field[6], data_field[7]]);
+                    
                     // Collect data from subsequent entries based on span
                     let mut chunk_data = Vec::new();
                     let num_data_entries = (span - 1) as usize;
@@ -304,6 +310,18 @@ pub fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
                         let data_entry_offset = entries_offset + (data_entry_idx * ENTRY_SIZE);
                         let data_entry = &page_data[data_entry_offset..data_entry_offset + ENTRY_SIZE];
                         chunk_data.extend_from_slice(data_entry);
+                    }
+                    
+                    // Truncate to actual chunk size
+                    chunk_data.truncate(chunk_size);
+                    
+                    // Validate CRC32
+                    let actual_crc = crc32c(&chunk_data);
+                    if actual_crc != expected_crc {
+                        return Err(Error::InvalidValue(format!(
+                            "BLOB_DATA chunk CRC mismatch: expected 0x{:08x}, got 0x{:08x}",
+                            expected_crc, actual_crc
+                        )));
                     }
                     
                     blob_data_chunks
