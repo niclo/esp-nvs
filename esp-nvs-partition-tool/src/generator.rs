@@ -387,6 +387,9 @@ fn write_blob_entries(
     key: &str,
     bytes: &[u8],
 ) -> Result<(), Error> {
+    // Each BLOB_DATA chunk can hold up to 1984 bytes (62 entries * 32 bytes)
+    const MAX_DATA_PER_CHUNK: usize = 1984;
+    
     // Write BLOB_INDEX entry first
     let page_offset = page_index * FLASH_SECTOR_SIZE;
     let entry_offset =
@@ -398,8 +401,7 @@ fn write_blob_entries(
     data[entry_offset + 1] = ITEM_TYPE_BLOB_INDEX;
 
     // Calculate number of chunks needed
-    const MAX_DATA_PER_ENTRY: usize = 32; // Each BLOB_DATA entry can hold 32 bytes
-    let chunk_count = bytes.len().div_ceil(MAX_DATA_PER_ENTRY);
+    let chunk_count = bytes.len().div_ceil(MAX_DATA_PER_CHUNK);
     data[entry_offset + 2] = 1; // span for BLOB_INDEX must always be 1
     data[entry_offset + 3] = 0; // chunk_start (version 0)
 
@@ -418,28 +420,48 @@ fn write_blob_entries(
     *entry_index += 1;
 
     // Write BLOB_DATA entries
-    for (chunk_idx, chunk) in bytes.chunks(MAX_DATA_PER_ENTRY).enumerate() {
+    // Each BLOB_DATA chunk should use SIZED format with variable span
+    for (chunk_idx, chunk_data) in bytes.chunks(MAX_DATA_PER_CHUNK).enumerate() {
         let entry_offset =
             page_offset + PAGE_HEADER_SIZE + ENTRY_STATE_BITMAP_SIZE + (*entry_index * ENTRY_SIZE);
 
         set_entry_state(data, page_index, *entry_index, ENTRY_STATE_WRITTEN);
 
+        // Calculate span: 1 (header) + number of data entries needed
+        let num_data_entries = chunk_data.len().div_ceil(ENTRY_SIZE);
+        let span = (1 + num_data_entries) as u8;
+
         data[entry_offset] = namespace_index;
         data[entry_offset + 1] = ITEM_TYPE_BLOB_DATA;
-        data[entry_offset + 2] = 1; // span
+        data[entry_offset + 2] = span;
         data[entry_offset + 3] = chunk_idx as u8; // chunk_index
 
         let crc_offset = entry_offset + 4;
         let key_offset = entry_offset + 8;
         write_key(&mut data[key_offset..key_offset + 16], key)?;
 
+        // Write ItemDataSized structure in data field
         let data_offset = entry_offset + 24;
-        data[data_offset..data_offset + chunk.len()].copy_from_slice(chunk);
+        data[data_offset..data_offset + 2].copy_from_slice(&(chunk_data.len() as u16).to_le_bytes());
+        data[data_offset + 2..data_offset + 4].copy_from_slice(&RESERVED_U16.to_le_bytes());
+        let chunk_crc = crc32c(chunk_data);
+        data[data_offset + 4..data_offset + 8].copy_from_slice(&chunk_crc.to_le_bytes());
 
         let entry_crc = calculate_entry_crc(&data[entry_offset..entry_offset + ENTRY_SIZE]);
         data[crc_offset..crc_offset + 4].copy_from_slice(&entry_crc.to_le_bytes());
 
         *entry_index += 1;
+
+        // Write actual data in subsequent entries
+        for (i, data_chunk) in chunk_data.chunks(ENTRY_SIZE).enumerate() {
+            let data_entry_idx = *entry_index + i;
+            set_entry_state(data, page_index, data_entry_idx, ENTRY_STATE_WRITTEN);
+            
+            let data_entry_offset = page_offset + PAGE_HEADER_SIZE + ENTRY_STATE_BITMAP_SIZE + (data_entry_idx * ENTRY_SIZE);
+            data[data_entry_offset..data_entry_offset + data_chunk.len()].copy_from_slice(data_chunk);
+        }
+
+        *entry_index += num_data_entries;
     }
 
     Ok(())
