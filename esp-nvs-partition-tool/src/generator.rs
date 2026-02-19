@@ -137,8 +137,8 @@ pub fn generate_partition<P: AsRef<Path>>(
         }
     }
 
-    // Mark the last page as full
-    if current_entry > 0 {
+    // Mark the last page as full only if it has no remaining free entries
+    if current_entry >= ENTRIES_PER_PAGE {
         write_page_header(
             &mut binary_data,
             current_page,
