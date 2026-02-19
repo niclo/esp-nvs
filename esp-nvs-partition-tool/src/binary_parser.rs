@@ -252,7 +252,7 @@ pub fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
                         partition.add_entry(NvsEntry::new_data(
                             key,
                             Encoding::String,
-                            DataValue::String(s.trim_end().to_string()), // Trim trailing spaces/nulls
+                            DataValue::String(s.trim_end_matches('\0').to_string()), // Trim only trailing nulls
                         ));
                     } else {
                         partition.add_entry(NvsEntry::new_data(

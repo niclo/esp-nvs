@@ -31,4 +31,10 @@ pub enum Error {
 
     #[error("Partition size {0} is too small")]
     PartitionTooSmall(usize),
+
+    #[error("Invalid partition size {0}: must be a multiple of 4096 bytes")]
+    InvalidPartitionSize(usize),
+
+    #[error("Blob too large to fit in partition")]
+    BlobTooLarge,
 }

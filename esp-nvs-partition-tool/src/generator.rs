@@ -42,6 +42,11 @@ pub fn generate_partition<P: AsRef<Path>>(
     if size < FLASH_SECTOR_SIZE {
         return Err(Error::PartitionTooSmall(size));
     }
+    
+    // Validate size is a multiple of FLASH_SECTOR_SIZE
+    if size % FLASH_SECTOR_SIZE != 0 {
+        return Err(Error::InvalidPartitionSize(size));
+    }
 
     let num_pages = size / FLASH_SECTOR_SIZE;
     let mut binary_data = vec![0xFF; size]; // Initialize with erased flash (0xFF)
@@ -61,6 +66,8 @@ pub fn generate_partition<P: AsRef<Path>>(
                 // Reuse existing namespace ID if the namespace was already seen
                 if let Some(&existing_id) = namespace_map.get(&entry.key) {
                     current_namespace = Some(existing_id);
+                    // Skip writing the namespace entry since it already exists
+                    continue;
                 } else {
                     // Register new namespace with next available index
                     namespace_counter += 1;
@@ -95,7 +102,7 @@ pub fn generate_partition<P: AsRef<Path>>(
                     current_page,
                     current_entry,
                     &entry.key,
-                    namespace_counter,
+                    current_namespace.unwrap(),
                 )?;
                 current_entry += 1;
             }
@@ -390,6 +397,19 @@ fn write_blob_entries(
     // Each BLOB_DATA chunk can hold up to 1984 bytes (62 entries * 32 bytes)
     const MAX_DATA_PER_CHUNK: usize = 1984;
     
+    // Calculate total entries needed for all chunks
+    let chunk_count = bytes.len().div_ceil(MAX_DATA_PER_CHUNK);
+    let mut total_entries_needed = 1; // BLOB_INDEX
+    for chunk_data in bytes.chunks(MAX_DATA_PER_CHUNK) {
+        let num_data_entries = chunk_data.len().div_ceil(ENTRY_SIZE);
+        total_entries_needed += 1 + num_data_entries; // header + data entries
+    }
+    
+    // Check if blob will fit in current page
+    if *entry_index + total_entries_needed > ENTRIES_PER_PAGE {
+        return Err(Error::BlobTooLarge);
+    }
+    
     // Write BLOB_INDEX entry first
     let page_offset = page_index * FLASH_SECTOR_SIZE;
     let entry_offset =
@@ -401,7 +421,6 @@ fn write_blob_entries(
     data[entry_offset + 1] = ITEM_TYPE_BLOB_INDEX;
 
     // Calculate number of chunks needed
-    let chunk_count = bytes.len().div_ceil(MAX_DATA_PER_CHUNK);
     data[entry_offset + 2] = 1; // span for BLOB_INDEX must always be 1
     data[entry_offset + 3] = 0; // chunk_start (version 0)
 
@@ -422,14 +441,21 @@ fn write_blob_entries(
     // Write BLOB_DATA entries
     // Each BLOB_DATA chunk should use SIZED format with variable span
     for (chunk_idx, chunk_data) in bytes.chunks(MAX_DATA_PER_CHUNK).enumerate() {
+        // Check if this chunk will fit in current page
+        let num_data_entries = chunk_data.len().div_ceil(ENTRY_SIZE);
+        let chunk_span = 1 + num_data_entries;
+        
+        if *entry_index + chunk_span > ENTRIES_PER_PAGE {
+            return Err(Error::BlobTooLarge);
+        }
+        
         let entry_offset =
             page_offset + PAGE_HEADER_SIZE + ENTRY_STATE_BITMAP_SIZE + (*entry_index * ENTRY_SIZE);
 
         set_entry_state(data, page_index, *entry_index, ENTRY_STATE_WRITTEN);
 
         // Calculate span: 1 (header) + number of data entries needed
-        let num_data_entries = chunk_data.len().div_ceil(ENTRY_SIZE);
-        let span = (1 + num_data_entries) as u8;
+        let span = chunk_span as u8;
 
         data[entry_offset] = namespace_index;
         data[entry_offset + 1] = ITEM_TYPE_BLOB_DATA;
@@ -455,6 +481,11 @@ fn write_blob_entries(
         // Write actual data in subsequent entries
         for (i, data_chunk) in chunk_data.chunks(ENTRY_SIZE).enumerate() {
             let data_entry_idx = *entry_index + i;
+            
+            if data_entry_idx >= ENTRIES_PER_PAGE {
+                return Err(Error::BlobTooLarge);
+            }
+            
             set_entry_state(data, page_index, data_entry_idx, ENTRY_STATE_WRITTEN);
             
             let data_entry_offset = page_offset + PAGE_HEADER_SIZE + ENTRY_STATE_BITMAP_SIZE + (data_entry_idx * ENTRY_SIZE);
@@ -524,8 +555,17 @@ fn calculate_entries_needed(encoding: &Encoding, value: &DataValue) -> usize {
                 1 + num_data_entries
             } else {
                 // BLOB_INDEX + BLOB_DATA entries
-                let chunk_count = len.div_ceil(32);
-                1 + chunk_count
+                // Each chunk can hold MAX_DATA_PER_CHUNK bytes and requires:
+                // 1 header entry + ceil(chunk_size / 32) data entries
+                const MAX_DATA_PER_CHUNK: usize = 1984; // 62 entries * 32 bytes
+                
+                let mut total_entries = 1; // BLOB_INDEX
+                for chunk_size in (0..len).step_by(MAX_DATA_PER_CHUNK) {
+                    let current_chunk_size = std::cmp::min(MAX_DATA_PER_CHUNK, len - chunk_size);
+                    let num_data_entries = current_chunk_size.div_ceil(ENTRY_SIZE);
+                    total_entries += 1 + num_data_entries; // header + data entries
+                }
+                total_entries
             }
         }
     }
