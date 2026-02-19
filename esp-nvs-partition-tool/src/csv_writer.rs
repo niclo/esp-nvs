@@ -1,26 +1,25 @@
 use crate::error::Error;
 use crate::types::*;
-use std::fs::File;
-use std::io::Write;
+use csv::Writer;
 use std::path::Path;
 
 pub fn write_csv<P: AsRef<Path>>(partition: &NvsPartition, output_path: P) -> Result<(), Error> {
-    let mut file = File::create(output_path)?;
+    let mut wtr = Writer::from_path(output_path)?;
     
     // Write header
-    writeln!(file, "key,type,encoding,value")?;
+    wtr.write_record(&["key", "type", "encoding", "value"])?;
     
     // Write entries
     for entry in &partition.entries {
         match entry.entry_type {
             EntryType::Namespace => {
-                writeln!(file, "{},namespace,,", entry.key)?;
+                wtr.write_record(&[&entry.key, "namespace", "", ""])?;
             }
             EntryType::Data => {
                 if let (Some(encoding), Some(value)) = (&entry.encoding, &entry.value) {
                     let encoding_str = encoding_to_string(encoding);
                     let value_str = value_to_string(value, encoding)?;
-                    writeln!(file, "{},data,{},{}", entry.key, encoding_str, value_str)?;
+                    wtr.write_record(&[&entry.key, "data", encoding_str, &value_str])?;
                 }
             }
             EntryType::File => {
@@ -28,12 +27,13 @@ pub fn write_csv<P: AsRef<Path>>(partition: &NvsPartition, output_path: P) -> Re
                 if let (Some(encoding), Some(value)) = (&entry.encoding, &entry.value) {
                     let encoding_str = encoding_to_string(encoding);
                     let value_str = value_to_string(value, encoding)?;
-                    writeln!(file, "{},data,{},{}", entry.key, encoding_str, value_str)?;
+                    wtr.write_record(&[&entry.key, "data", encoding_str, &value_str])?;
                 }
             }
         }
     }
     
+    wtr.flush()?;
     Ok(())
 }
 
@@ -76,7 +76,7 @@ fn value_to_string(value: &DataValue, _encoding: &Encoding) -> Result<String, Er
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
-    use std::io::Read;
+    use std::fs;
 
     #[test]
     fn test_write_csv_simple() {
@@ -96,11 +96,7 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         write_csv(&partition, temp_file.path()).unwrap();
 
-        let mut content = String::new();
-        File::open(temp_file.path())
-            .unwrap()
-            .read_to_string(&mut content)
-            .unwrap();
+        let content = fs::read_to_string(temp_file.path()).unwrap();
 
         assert!(content.contains("key,type,encoding,value"));
         assert!(content.contains("test_ns,namespace,,"));

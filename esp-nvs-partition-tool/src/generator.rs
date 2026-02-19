@@ -58,10 +58,15 @@ pub fn generate_partition<P: AsRef<Path>>(
     for entry in &partition.entries {
         match entry.entry_type {
             EntryType::Namespace => {
-                // Register namespace with next available index
-                namespace_counter += 1;
-                namespace_map.insert(entry.key.clone(), namespace_counter);
-                current_namespace = Some(namespace_counter);
+                // Reuse existing namespace ID if the namespace was already seen
+                if let Some(&existing_id) = namespace_map.get(&entry.key) {
+                    current_namespace = Some(existing_id);
+                } else {
+                    // Register new namespace with next available index
+                    namespace_counter += 1;
+                    namespace_map.insert(entry.key.clone(), namespace_counter);
+                    current_namespace = Some(namespace_counter);
+                }
 
                 // Write namespace entry
                 if current_entry >= ENTRIES_PER_PAGE {
