@@ -7,12 +7,14 @@
   overlays = [
     (final: prev: {
       esp-idf-nvs-partition-gen = final.callPackage ./.nix/esp-idf-nvs-partition-gen.nix {};
+      esp-nvs-partition-tool = final.callPackage ./.nix/esp-nvs-partition-tool.nix {};
     })
   ];
 
   # https://devenv.sh/packages/
   packages = [
     pkgs.esp-idf-nvs-partition-gen
+    pkgs.esp-nvs-partition-tool
     pkgs.git
     pkgs.just
     pkgs.actionlint

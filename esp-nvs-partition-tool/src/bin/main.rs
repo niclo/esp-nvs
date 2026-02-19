@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
-use nvs_part::{generate_partition, parse_binary, parse_csv, write_csv, Error};
+use esp_nvs_partition_tool::{generate_partition, parse_binary, parse_csv, write_csv, Error};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "nvs_part")]
+#[command(name = "esp-nvs-partition-tool")]
 #[command(about = "ESP-IDF NVS partition generator and parser", long_about = None)]
 struct Cli {
     #[command(subcommand)]

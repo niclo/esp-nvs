@@ -1,4 +1,4 @@
-# nvs_part
+# esp-nvs-partition-tool
 
 ESP-IDF compatible NVS (Non-Volatile Storage) partition table parser and generator.
 
@@ -57,7 +57,7 @@ config,file,binary,config.bin
 ### Generate NVS Partition Binary
 
 ```bash
-nvs_part generate <input.csv> <output.bin> --size <size>
+esp-nvs-partition-tool generate <input.csv> <output.bin> --size <size>
 ```
 
 Arguments:
@@ -69,16 +69,16 @@ The size can be specified in decimal or hexadecimal (with `0x` prefix):
 
 ```bash
 # Generate 16KB partition (decimal)
-nvs_part generate nvs_data.csv partition.bin --size 16384
+esp-nvs-partition-tool generate nvs_data.csv partition.bin --size 16384
 
 # Generate 16KB partition (hexadecimal)
-nvs_part generate nvs_data.csv partition.bin --size 0x4000
+esp-nvs-partition-tool generate nvs_data.csv partition.bin --size 0x4000
 ```
 
 ### Parse NVS Partition Binary to CSV
 
 ```bash
-nvs_part parse <input.bin> <output.csv>
+esp-nvs-partition-tool parse <input.bin> <output.csv>
 ```
 
 Arguments:
@@ -89,7 +89,7 @@ Example:
 
 ```bash
 # Parse a partition binary back to CSV
-nvs_part parse partition.bin recovered_data.csv
+esp-nvs-partition-tool parse partition.bin recovered_data.csv
 ```
 
 ## Library Usage
@@ -98,13 +98,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nvs_part = "0.1"
+esp-nvs-partition-tool = "0.1"
 ```
 
 Example usage:
 
 ```rust
-use nvs_part::{parse_csv, generate_partition, parse_binary, write_csv};
+use esp_nvs_partition_tool::{parse_csv, generate_partition, parse_binary, write_csv};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse CSV file and generate binary

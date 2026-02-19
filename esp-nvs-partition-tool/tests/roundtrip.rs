@@ -1,4 +1,4 @@
-use nvs_part::{generate_partition, parse_binary, parse_csv, write_csv};
+use esp_nvs_partition_tool::{generate_partition, parse_binary, parse_csv, write_csv};
 use std::fs;
 use tempfile::NamedTempFile;
 
