@@ -7,7 +7,8 @@ This library and CLI tool allows you to parse and generate NVS partition binary 
 ## Features
 
 - ✅ Parse NVS CSV files according to ESP-IDF format
-- ✅ Generate NVS partition binaries
+- ✅ Generate NVS partition binaries from CSV
+- ✅ Parse NVS partition binaries back to CSV
 - ✅ Support for all data types: u8, i8, u16, i16, u32, i32, u64, i64, string, binary
 - ✅ Support for hex2bin and base64 encodings
 - ✅ Support for file references in CSV
@@ -74,6 +75,23 @@ nvs_part generate nvs_data.csv partition.bin --size 16384
 nvs_part generate nvs_data.csv partition.bin --size 0x4000
 ```
 
+### Parse NVS Partition Binary to CSV
+
+```bash
+nvs_part parse <input.bin> <output.csv>
+```
+
+Arguments:
+- `input.bin` - Path to the input binary partition file
+- `output.csv` - Path to the output CSV file
+
+Example:
+
+```bash
+# Parse a partition binary back to CSV
+nvs_part parse partition.bin recovered_data.csv
+```
+
 ## Library Usage
 
 Add to your `Cargo.toml`:
@@ -86,15 +104,19 @@ nvs_part = "0.1"
 Example usage:
 
 ```rust
-use nvs_part::{parse_csv, generate_partition};
+use nvs_part::{parse_csv, generate_partition, parse_binary, write_csv};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse CSV file
+    // Parse CSV file and generate binary
     let partition = parse_csv("nvs_data.csv")?;
-    
-    // Generate binary partition
     generate_partition(&partition, "output.bin", 16384)?;
     
+    // Parse binary back to CSV
+    let recovered_partition = parse_binary("output.bin")?;
+    write_csv(&recovered_partition, "recovered.csv")?;
+    
+    Ok(())
+}
     Ok(())
 }
 ```

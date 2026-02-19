@@ -252,10 +252,16 @@ fn write_data_entry(
                 }
             };
 
-            if bytes.len() <= 8 {
-                // Small string/blob - use SIZED type (single entry)
+            // Use SIZED for data that fits in reasonable number of entries within one page
+            // Threshold: data that needs <= 60 entries (leaving room for other entries on the page)
+            const MAX_SIZED_ENTRIES: usize = 60;
+            const MAX_SIZED_DATA_SIZE: usize = MAX_SIZED_ENTRIES * ENTRY_SIZE; // 60 * 32 = 1920 bytes
+            
+            if bytes.len() <= MAX_SIZED_DATA_SIZE {
+                // Use SIZED type for smaller data
                 write_sized_entry(data, page_index, *entry_index, namespace_index, key, &bytes)?;
-                *entry_index += 1;
+                let num_data_entries = bytes.len().div_ceil(ENTRY_SIZE);
+                *entry_index += 1 + num_data_entries; // Skip the SIZED entry + data entries
             } else {
                 // Large blob - use BLOB_INDEX + BLOB_DATA entries
                 write_blob_entries(data, page_index, entry_index, namespace_index, key, &bytes)?;
@@ -333,9 +339,14 @@ fn write_sized_entry(
 
     set_entry_state(data, page_index, entry_index, ENTRY_STATE_WRITTEN);
 
+    // Calculate span based on data size
+    // Each additional entry can hold 32 bytes of data
+    let num_data_entries = bytes.len().div_ceil(ENTRY_SIZE);
+    let span = (1 + num_data_entries) as u8; // 1 for the SIZED entry itself + data entries
+
     data[entry_offset] = namespace_index;
     data[entry_offset + 1] = ITEM_TYPE_SIZED;
-    data[entry_offset + 2] = 1; // span
+    data[entry_offset + 2] = span;
     data[entry_offset + 3] = 0xFF; // chunk_index
 
     let crc_offset = entry_offset + 4;
@@ -343,8 +354,6 @@ fn write_sized_entry(
     write_key(&mut data[key_offset..key_offset + 16], key)?;
 
     let data_offset = entry_offset + 24;
-    // For SIZED entries, max size is 8 bytes (checked by caller)
-    assert!(bytes.len() <= 8, "SIZED entry must be <= 8 bytes");
     data[data_offset..data_offset + 2].copy_from_slice(&(bytes.len() as u16).to_le_bytes());
     data[data_offset + 2..data_offset + 4].copy_from_slice(&RESERVED_U16.to_le_bytes());
     let data_crc = crc32c(bytes);
@@ -352,6 +361,15 @@ fn write_sized_entry(
 
     let entry_crc = calculate_entry_crc(&data[entry_offset..entry_offset + ENTRY_SIZE]);
     data[crc_offset..crc_offset + 4].copy_from_slice(&entry_crc.to_le_bytes());
+
+    // Write data in subsequent entries
+    for (i, chunk) in bytes.chunks(ENTRY_SIZE).enumerate() {
+        let data_entry_idx = entry_index + 1 + i;
+        set_entry_state(data, page_index, data_entry_idx, ENTRY_STATE_WRITTEN);
+        
+        let data_entry_offset = page_offset + PAGE_HEADER_SIZE + ENTRY_STATE_BITMAP_SIZE + (data_entry_idx * ENTRY_SIZE);
+        data[data_entry_offset..data_entry_offset + chunk.len()].copy_from_slice(chunk);
+    }
 
     Ok(())
 }
@@ -469,8 +487,14 @@ fn calculate_entries_needed(encoding: &Encoding, value: &DataValue) -> usize {
                 DataValue::Binary(b) => b.len(),
                 _ => 0,
             };
-            if len <= 8 {
-                1 // SIZED entry
+            
+            const MAX_SIZED_ENTRIES: usize = 60;
+            const MAX_SIZED_DATA_SIZE: usize = MAX_SIZED_ENTRIES * 32; // 1920 bytes
+            
+            if len <= MAX_SIZED_DATA_SIZE {
+                // SIZED entry + data entries
+                let num_data_entries = len.div_ceil(ENTRY_SIZE);
+                1 + num_data_entries
             } else {
                 // BLOB_INDEX + BLOB_DATA entries
                 let chunk_count = len.div_ceil(32);
