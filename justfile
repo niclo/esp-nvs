@@ -19,6 +19,6 @@ publish:
 update-changelog:
     git-cliff --bump -o CHANGELOG.md
 
-[working-directory: 'tests/assets/']
+[working-directory: 'esp-nvs-lib/tests/assets/']
 generate_test_nvs_bin:
-    nvs_partition_gen generate test_nvs_data.csv test_nvs_data.bin 0x4000
+    ../../target/release/nvs_part generate test_nvs_data.csv test_nvs_data.bin --size 0x4000

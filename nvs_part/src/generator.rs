@@ -160,8 +160,8 @@ fn write_page_header(data: &mut [u8], page_index: usize, sequence: u32, state: u
     // Write sequence number
     data[offset + 4..offset + 8].copy_from_slice(&sequence.to_le_bytes());
 
-    // Write version (1 for NVS format version 1)
-    data[offset + 8] = 1;
+    // Write version (0xFE for NVS format - used by ESP-IDF)
+    data[offset + 8] = 0xFE;
 
     // Reserved bytes (19 bytes) are already 0xFF
 
@@ -184,11 +184,11 @@ fn write_namespace_entry(
     // Mark entry as written in bitmap
     set_entry_state(data, page_index, entry_index, ENTRY_STATE_WRITTEN);
 
-    // Namespace entries use namespace_index 0, type SIZED, and store namespace name
+    // Namespace entries use namespace_index 0, type U8, and the data field stores the namespace ID
     data[entry_offset] = 0; // namespace_index for namespace entries
-    data[entry_offset + 1] = ITEM_TYPE_SIZED; // type
+    data[entry_offset + 1] = ITEM_TYPE_U8; // type = U8 (0x01)
     data[entry_offset + 2] = 1; // span
-    data[entry_offset + 3] = namespace_index; // chunk_index stores the namespace ID
+    data[entry_offset + 3] = 0xFF; // chunk_index is 0xFF for non-blob entries
 
     // CRC placeholder (will be calculated later)
     let crc_offset = entry_offset + 4;
@@ -197,13 +197,10 @@ fn write_namespace_entry(
     let key_offset = entry_offset + 8;
     write_key(&mut data[key_offset..key_offset + 16], key)?;
 
-    // Data field for namespace: size and crc of namespace name
+    // Data field for namespace: just the namespace index as a u8
     let data_offset = entry_offset + 24;
-    let ns_bytes = key.as_bytes();
-    data[data_offset..data_offset + 2].copy_from_slice(&(ns_bytes.len() as u16).to_le_bytes());
-    data[data_offset + 2..data_offset + 4].copy_from_slice(&0xFFFFu16.to_le_bytes()); // reserved
-    let ns_crc = crc32c(ns_bytes);
-    data[data_offset + 4..data_offset + 8].copy_from_slice(&ns_crc.to_le_bytes());
+    data[data_offset] = namespace_index;
+    // Rest of data field is already 0xFF from initialization
 
     // Calculate and write entry CRC
     let entry_crc = calculate_entry_crc(&data[entry_offset..entry_offset + ENTRY_SIZE]);
@@ -430,9 +427,9 @@ fn write_key(dest: &mut [u8], key: &str) -> Result<(), Error> {
 
     let key_bytes = key.as_bytes();
     dest[..key_bytes.len()].copy_from_slice(key_bytes);
-    // Rest is already 0xFF from initialization, we need to null-terminate
-    if key_bytes.len() < MAX_KEY_LENGTH {
-        dest[key_bytes.len()] = 0;
+    // Null-terminate and zero-fill the rest (ESP-IDF format uses zeros, not 0xFF)
+    for byte in dest.iter_mut().take(16).skip(key_bytes.len()) {
+        *byte = 0;
     }
 
     Ok(())

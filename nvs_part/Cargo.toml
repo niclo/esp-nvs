@@ -30,3 +30,6 @@ features = ["derive"]
 
 [dev-dependencies]
 tempfile = "3.14"
+esp-nvs = { path = "../esp-nvs-lib" }
+libz-sys = "1.1.22"
+embedded-storage = "0.3.1"
