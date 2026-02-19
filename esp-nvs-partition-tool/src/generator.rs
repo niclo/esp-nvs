@@ -395,7 +395,7 @@ fn write_blob_entries(
     // Calculate number of chunks needed
     const MAX_DATA_PER_ENTRY: usize = 32; // Each BLOB_DATA entry can hold 32 bytes
     let chunk_count = bytes.len().div_ceil(MAX_DATA_PER_ENTRY);
-    data[entry_offset + 2] = chunk_count as u8; // span
+    data[entry_offset + 2] = 1; // span for BLOB_INDEX must always be 1
     data[entry_offset + 3] = 0; // chunk_start (version 0)
 
     let crc_offset = entry_offset + 4;
