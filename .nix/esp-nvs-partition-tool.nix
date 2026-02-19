@@ -20,7 +20,7 @@ rustPlatform.buildRustPackage {
 
   meta = with lib; {
     description = "ESP-IDF compatible NVS partition table parser and generator";
-    homepage = "https://github.com/niclo/esp-nvs";
+    homepage = "https://github.com/lhemala/esp-nvs/";
     license = with licenses; [ mit asl20 ];
     maintainers = [ ];
     mainProgram = "esp-nvs-partition-tool";
