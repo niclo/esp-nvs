@@ -6,7 +6,7 @@ use tempfile::NamedTempFile;
 #[ignore] // Skip for now - has issues with large blob data
 fn test_csv_binary_csv_roundtrip() {
     // Parse original CSV
-    let original_partition = parse_csv("../esp-nvs-lib/tests/assets/test_nvs_data.csv").unwrap();
+    let original_partition = parse_csv("../esp-nvs/tests/assets/test_nvs_data.csv").unwrap();
     
     // Generate binary
     let bin_file = NamedTempFile::new().unwrap();
