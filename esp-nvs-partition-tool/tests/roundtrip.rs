@@ -25,17 +25,10 @@ fn test_csv_binary_csv_roundtrip() {
 
 #[test]
 fn test_simple_roundtrip() {
-    let csv_content = "key,type,encoding,value
-test_ns,namespace,,
-val1,data,u8,42
-val2,data,string,hello world
-val3,data,i32,-1234";
-    
-    let csv_file = NamedTempFile::new().unwrap();
-    fs::write(csv_file.path(), csv_content).unwrap();
+    let csv_path = "tests/assets/simple_roundtrip.csv";
     
     // CSV -> Binary
-    let partition1 = parse_csv(csv_file.path()).unwrap();
+    let partition1 = parse_csv(csv_path).unwrap();
     let bin_file = NamedTempFile::new().unwrap();
     generate_partition(&partition1, bin_file.path(), 16384).unwrap();
     

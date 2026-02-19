@@ -4,19 +4,11 @@ use tempfile::NamedTempFile;
 
 #[test]
 fn test_roundtrip_csv_to_binary() {
-    // Create a test CSV
-    let csv_content = r#"key,type,encoding,value
-test_namespace,namespace,,
-u8_val,data,u8,42
-i32_val,data,i32,-12345
-test_str,data,string,Hello World
-"#;
-
-    let csv_file = NamedTempFile::new().unwrap();
-    fs::write(csv_file.path(), csv_content).unwrap();
+    // Load test CSV from file
+    let csv_path = "tests/assets/roundtrip_basic.csv";
 
     // Parse CSV
-    let partition = parse_csv(csv_file.path()).unwrap();
+    let partition = parse_csv(csv_path).unwrap();
 
     // Verify parsed entries
     assert_eq!(partition.entries.len(), 4);
@@ -70,15 +62,9 @@ fn test_generate_from_api() {
 
 #[test]
 fn test_hex2bin_encoding() {
-    let csv_content = r#"key,type,encoding,value
-ns,namespace,,
-data,data,hex2bin,00112233445566778899AABBCCDDEEFF
-"#;
+    let csv_path = "tests/assets/hex2bin_test.csv";
 
-    let csv_file = NamedTempFile::new().unwrap();
-    fs::write(csv_file.path(), csv_content).unwrap();
-
-    let partition = parse_csv(csv_file.path()).unwrap();
+    let partition = parse_csv(csv_path).unwrap();
     assert_eq!(partition.entries.len(), 2);
 
     match &partition.entries[1].value {
@@ -94,19 +80,9 @@ data,data,hex2bin,00112233445566778899AABBCCDDEEFF
 
 #[test]
 fn test_multiple_namespaces() {
-    let csv_content = r#"key,type,encoding,value
-ns1,namespace,,
-key1,data,u8,1
-ns2,namespace,,
-key2,data,u8,2
-ns1,namespace,,
-key3,data,u8,3
-"#;
+    let csv_path = "tests/assets/multiple_namespaces.csv";
 
-    let csv_file = NamedTempFile::new().unwrap();
-    fs::write(csv_file.path(), csv_content).unwrap();
-
-    let partition = parse_csv(csv_file.path()).unwrap();
+    let partition = parse_csv(csv_path).unwrap();
     assert_eq!(partition.entries.len(), 6);
 
     // Generate binary
@@ -151,13 +127,8 @@ fn test_invalid_partition_size() {
 
 #[test]
 fn test_key_length_validation() {
-    let csv_content = r#"key,type,encoding,value
-verylongkeynamethatistoolongfortheformat,namespace,,
-"#;
+    let csv_path = "tests/assets/invalid_long_key.csv";
 
-    let csv_file = NamedTempFile::new().unwrap();
-    fs::write(csv_file.path(), csv_content).unwrap();
-
-    let result = parse_csv(csv_file.path());
+    let result = parse_csv(csv_path);
     assert!(result.is_err());
 }
