@@ -62,11 +62,6 @@ fn parse_row(row: CsvRow, namespace: String) -> Result<NvsEntry, Error> {
             Ok(NvsEntry::new_data(namespace, row.key, value))
         }
         "file" => {
-            if row.encoding.is_empty() {
-                return Err(Error::InvalidEncoding(
-                    "file entries must have an encoding".to_string(),
-                ));
-            }
             if row.value.is_empty() {
                 return Err(Error::InvalidValue(
                     "file entries must have a file path".to_string(),
