@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ::csv::Writer;
+use csv::Writer;
 
 use crate::error::Error;
 use crate::partition::EntryContent;
