@@ -11,7 +11,7 @@ use esp_nvs_partition_tool::{
 
 #[derive(Parser)]
 #[command(name = "esp-nvs-partition-tool")]
-#[command(about = "ESP-IDF NVS partition generator and parser", long_about = None)]
+#[command(about = "ESP NVS partition generator and parser", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
