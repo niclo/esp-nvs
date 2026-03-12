@@ -39,4 +39,7 @@ pub enum Error {
 
     #[error("too many namespaces (max 255)")]
     TooManyNamespaces,
+
+    #[error("nvs error: {0}")]
+    NvsError(#[from] esp_nvs::error::Error),
 }

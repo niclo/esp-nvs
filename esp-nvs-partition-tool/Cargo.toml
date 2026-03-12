@@ -27,14 +27,12 @@ cli = ["dep:clap"]
 base64 = "0.22.1"
 clap = { version = "4.5.60", features = ["derive"], optional = true }
 csv = "1.4.0"
+esp-nvs = { path = "../esp-nvs" }
 hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 
 
 [dev-dependencies]
-embedded-storage = "0.3.1"
-esp-nvs = { path = "../esp-nvs" }
-libz-sys = "1.1.22"
 similar = "2"
 tempfile = "3.25.0"

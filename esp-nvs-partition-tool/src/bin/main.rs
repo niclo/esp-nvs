@@ -4,10 +4,7 @@ use clap::{
     Parser,
     Subcommand,
 };
-use esp_nvs_partition_tool::{
-    NvsPartition,
-    FLASH_SECTOR_SIZE,
-};
+use esp_nvs_partition_tool::NvsPartition;
 
 #[derive(Parser)]
 #[command(name = "esp-nvs-partition-tool")]
@@ -66,7 +63,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             partition.generate_partition_file(&output, size)?;
 
             println!("Successfully generated NVS partition: {}", output.display());
-            println!("Size: {} bytes ({} pages)", size, size / FLASH_SECTOR_SIZE);
+            println!(
+                "Size: {} bytes ({} pages)",
+                size,
+                size / esp_nvs::FLASH_SECTOR_SIZE
+            );
 
             Ok(())
         }

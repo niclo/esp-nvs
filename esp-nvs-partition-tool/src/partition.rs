@@ -1,17 +1,11 @@
-pub mod crc;
-
-pub(crate) mod consts;
 pub(crate) mod generator;
 pub(crate) mod parser;
 
 use std::path::PathBuf;
 
-pub use consts::FLASH_SECTOR_SIZE;
+pub use esp_nvs::MAX_KEY_LENGTH;
 
 use crate::error::Error;
-
-/// Maximum Key length is 15 bytes + 1 byte for the null terminator.
-pub const MAX_KEY_LENGTH: usize = 15;
 
 /// A single NVS key-value entry belonging to a namespace.
 #[derive(Debug, Clone, PartialEq, Eq)]

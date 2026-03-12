@@ -122,7 +122,15 @@ fn test_in_memory_api_parity() {
 /// Hand-crafted binary containing a legacy blob (type 0x41) parses correctly.
 #[test]
 fn test_parse_legacy_blob() {
-    use esp_nvs_partition_tool::partition::crc::crc32;
+    use esp_nvs::platform::software_crc32;
+
+    // Compute an NVS entry CRC the same way esp_nvs's Item::calculate_crc32 does:
+    // incremental software_crc32 over [0..4], [8..24], [24..32] with init = u32::MAX.
+    fn entry_crc(entry: &[u8]) -> u32 {
+        let mut crc = software_crc32(u32::MAX, &entry[0..4]);
+        crc = software_crc32(crc, &entry[8..24]);
+        software_crc32(crc, &entry[24..32])
+    }
 
     let mut page = vec![0xFF_u8; 4096];
 
@@ -130,7 +138,7 @@ fn test_parse_legacy_blob() {
     page[0..4].copy_from_slice(&0xFFFFFFFE_u32.to_le_bytes());
     page[4..8].copy_from_slice(&0_u32.to_le_bytes());
     page[8] = 0xFE; // version
-    let hdr_crc = crc32(&page[4..28]);
+    let hdr_crc = software_crc32(u32::MAX, &page[4..28]);
     page[28..32].copy_from_slice(&hdr_crc.to_le_bytes());
 
     // Entry-state bitmap: entries 0,1,2 = Written; rest = Empty
@@ -147,7 +155,7 @@ fn test_parse_legacy_blob() {
     let ns_key = b"test_ns\0\0\0\0\0\0\0\0\0";
     page[e0 + 8..e0 + 24].copy_from_slice(ns_key);
     page[e0 + 24] = 1;
-    let e0_crc = esp_nvs_partition_tool::partition::crc::crc32_entry(&page[e0..e0 + 32]);
+    let e0_crc = entry_crc(&page[e0..e0 + 32]);
     page[e0 + 4..e0 + 8].copy_from_slice(&e0_crc.to_le_bytes());
 
     // Entry 1: Legacy blob header (type 0x41, span=2)
@@ -162,9 +170,9 @@ fn test_parse_legacy_blob() {
     let payload_size = payload.len() as u16;
     page[e1 + 24..e1 + 26].copy_from_slice(&payload_size.to_le_bytes());
     page[e1 + 26..e1 + 28].copy_from_slice(&0xFFFF_u16.to_le_bytes());
-    let payload_crc = crc32(payload);
+    let payload_crc = software_crc32(u32::MAX, payload);
     page[e1 + 28..e1 + 32].copy_from_slice(&payload_crc.to_le_bytes());
-    let e1_crc = esp_nvs_partition_tool::partition::crc::crc32_entry(&page[e1..e1 + 32]);
+    let e1_crc = entry_crc(&page[e1..e1 + 32]);
     page[e1 + 4..e1 + 8].copy_from_slice(&e1_crc.to_le_bytes());
 
     // Entry 2: Blob data payload
@@ -331,7 +339,7 @@ fn test_primitive_roundtrip() {
         partition.entries.push(entry!(format!("k{i:03}"), U8, i));
     }
 
-    let data = partition.generate_partition(8192).unwrap();
+    let data = partition.generate_partition(16384).unwrap();
     let parsed = NvsPartition::parse_partition(&data).unwrap();
     assert_eq!(parsed.entries.len(), partition.entries.len());
 

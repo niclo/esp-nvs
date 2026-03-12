@@ -16,7 +16,6 @@ pub use partition::{
     EntryContent,
     FileEncoding,
     NvsEntry,
-    FLASH_SECTOR_SIZE,
     MAX_KEY_LENGTH,
 };
 
