@@ -13,8 +13,8 @@ fn test_csv_to_binary() {
 
     let partition = NvsPartition::from_csv_file(csv_path).unwrap();
     assert_eq!(partition.entries.len(), 3);
-    assert_eq!(partition.entries[0].namespace, "test_namespace");
-    assert_eq!(partition.entries[0].key, "u8_val");
+    assert_eq!(partition.entries[0].namespace, "storage");
+    assert_eq!(partition.entries[0].key, "int32_test");
 
     let bin_file = NamedTempFile::new().unwrap();
     partition
@@ -58,10 +58,10 @@ fn test_multiple_namespaces() {
     let csv_path = "tests/assets/multiple_namespaces.csv";
 
     let partition = NvsPartition::from_csv_file(csv_path).unwrap();
-    assert_eq!(partition.entries.len(), 3);
+    assert_eq!(partition.entries.len(), 64);
 
     let bin_file = NamedTempFile::new().unwrap();
-    let result = partition.generate_partition_file(bin_file.path(), 16384);
+    let result = partition.generate_partition_file(bin_file.path(), 0x6000);
     assert!(result.is_ok());
 }
 
@@ -72,7 +72,7 @@ fn test_large_string() {
     let partition = NvsPartition::from_csv_file(csv_path).unwrap();
 
     let bin_file = NamedTempFile::new().unwrap();
-    let result = partition.generate_partition_file(bin_file.path(), 16384);
+    let result = partition.generate_partition_file(bin_file.path(), 0x5000);
     assert!(result.is_ok());
 }
 

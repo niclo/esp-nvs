@@ -2,9 +2,9 @@ use std::path::Path;
 
 use csv::WriterBuilder;
 
+use crate::NvsPartition;
 use crate::csv::row::PartitionRow;
 use crate::error::Error;
-use crate::NvsPartition;
 
 /// Serialize an NVS partition to a CSV file at the given `output_path`.
 ///

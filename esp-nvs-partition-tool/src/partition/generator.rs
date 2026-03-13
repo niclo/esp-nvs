@@ -12,8 +12,8 @@ use super::{
     EntryContent,
     FileEncoding,
 };
-use crate::error::Error;
 use crate::NvsPartition;
+use crate::error::Error;
 
 /// Generate an NVS partition binary in memory and return it as a `Vec<u8>`.
 ///

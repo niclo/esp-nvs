@@ -15,8 +15,8 @@ pub use partition::{
     DataValue,
     EntryContent,
     FileEncoding,
-    NvsEntry,
     MAX_KEY_LENGTH,
+    NvsEntry,
 };
 
 /// A collection of NVS key-value entries, optionally spanning multiple
