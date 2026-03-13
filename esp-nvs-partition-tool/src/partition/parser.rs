@@ -12,8 +12,8 @@ use super::{
     DataValue,
     NvsEntry,
 };
-use crate::error::Error;
 use crate::NvsPartition;
+use crate::error::Error;
 
 /// Parse an NVS partition binary file at the given `path`.
 pub(crate) fn parse_binary<P: AsRef<Path>>(path: P) -> Result<NvsPartition, Error> {

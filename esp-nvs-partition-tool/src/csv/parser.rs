@@ -2,14 +2,14 @@ use std::path::Path;
 
 use base64::Engine;
 
+use crate::NvsPartition;
 use crate::error::Error;
 use crate::partition::{
-    validate_key,
     DataValue,
     FileEncoding,
     NvsEntry,
+    validate_key,
 };
-use crate::NvsPartition;
 
 #[derive(Debug, serde::Deserialize)]
 struct CsvRow {
