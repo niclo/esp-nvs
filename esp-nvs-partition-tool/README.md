@@ -90,13 +90,22 @@ Example usage:
 use esp_nvs_partition_tool::NvsPartition;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse CSV file and generate binary
-    let partition = NvsPartition::from_csv_file("nvs_data.csv")?;
-    partition.generate_partition_file("output.bin", 16384)?;
+    // Parse CSV content and generate binary
+    let csv_content = std::fs::read_to_string("nvs_data.csv")?;
+    let partition = NvsPartition::try_from_str(csv_content)?;
+    let binary = partition.generate_partition(16384)?;
+    std::fs::write("output.bin", &binary)?;
 
     // Parse binary back to CSV
-    let recovered_partition = NvsPartition::parse_partition_file("output.bin")?;
-    recovered_partition.to_csv_file("recovered.csv")?;
+    let binary = std::fs::read("output.bin")?;
+    let recovered_partition = NvsPartition::try_from_bytes(binary)?;
+    let csv_output = recovered_partition.to_csv()?;
+    std::fs::write("recovered.csv", &csv_output)?;
+
+    // Auto-detect format (binary or CSV)
+    let data = std::fs::read("output.bin")?;
+    let auto_partition = NvsPartition::try_from(data)?;
+    println!("Found {} entries", auto_partition.entries.len());
 
     Ok(())
 }

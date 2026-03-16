@@ -6,7 +6,8 @@ use esp_nvs_partition_tool::{
     NvsEntry,
     NvsPartition,
 };
-use tempfile::NamedTempFile;
+
+mod common;
 
 /// Perform a full CSV -> binary -> parse -> CSV -> parse -> binary roundtrip.
 ///
@@ -14,12 +15,12 @@ use tempfile::NamedTempFile;
 /// and binary1 is compared to a fresh generation from parsed1 to ensure
 /// the CSV serialization is lossless.
 fn roundtrip_csv_file(csv_path: &str, partition_size: usize) {
-    let original_partition = NvsPartition::from_csv_file(csv_path).unwrap();
+    let original_partition = common::read_csv_file(csv_path);
 
     let binary1 = original_partition
         .generate_partition(partition_size)
         .unwrap();
-    let parsed1 = NvsPartition::parse_partition(&binary1).unwrap();
+    let parsed1 = NvsPartition::try_from_bytes(binary1.clone()).unwrap();
 
     assert_eq!(
         original_partition.entries.len(),
@@ -28,7 +29,7 @@ fn roundtrip_csv_file(csv_path: &str, partition_size: usize) {
     );
 
     let csv2 = parsed1.clone().to_csv().unwrap();
-    let parsed2 = NvsPartition::from_csv(&csv2).unwrap();
+    let parsed2 = NvsPartition::try_from_str(&csv2).unwrap();
 
     assert_eq!(
         parsed1.entries.len(),
@@ -54,7 +55,7 @@ fn roundtrip_csv_file(csv_path: &str, partition_size: usize) {
     }
 
     let bin2 = parsed2.generate_partition(partition_size).unwrap();
-    let parsed3 = NvsPartition::parse_partition(&bin2).unwrap();
+    let parsed3 = NvsPartition::try_from_bytes(bin2).unwrap();
 
     assert_eq!(
         parsed2.entries.len(),
@@ -85,7 +86,7 @@ fn roundtrip_csv_file(csv_path: &str, partition_size: usize) {
 fn test_roundtrip_primitive() {
     roundtrip_csv_file("tests/assets/roundtrip_basic.csv", 0x4000);
 
-    let partition = NvsPartition::from_csv_file("tests/assets/roundtrip_basic.csv").unwrap();
+    let partition = common::read_csv_file("tests/assets/roundtrip_basic.csv");
     assert_eq!(partition.entries.len(), 3);
     assert_eq!(partition.entries[0].namespace, "storage");
     assert_entry_content(&partition, 0, &EntryContent::Data(DataValue::I32(42)));
@@ -99,11 +100,11 @@ fn test_roundtrip_primitive() {
 fn test_roundtrip_variable_len() {
     roundtrip_csv_file("tests/assets/large_string.csv", 0x5000);
 
-    let partition = NvsPartition::from_csv_file("tests/assets/large_string.csv").unwrap();
+    let partition = common::read_csv_file("tests/assets/large_string.csv");
     assert_eq!(partition.entries.len(), 5);
 
     let bin = partition.generate_partition(0x5000).unwrap();
-    let parsed = NvsPartition::parse_partition(&bin).unwrap();
+    let parsed = NvsPartition::try_from_bytes(bin).unwrap();
     assert_eq!(parsed.entries.len(), 5);
 
     assert_entry_content(
@@ -147,7 +148,7 @@ fn test_roundtrip_mixed() {
     roundtrip_csv_file("tests/assets/multiple_namespaces.csv", 0x6000);
 
     // Verify parsed structure matches the original test data
-    let partition = NvsPartition::from_csv_file("tests/assets/multiple_namespaces.csv").unwrap();
+    let partition = common::read_csv_file("tests/assets/multiple_namespaces.csv");
 
     // storage: 20 primitives + 1 blob = 21
     // etc:     20 primitives + 1 string = 21
@@ -155,7 +156,7 @@ fn test_roundtrip_mixed() {
     assert_eq!(partition.entries.len(), 64);
 
     let bin = partition.generate_partition(0x6000).unwrap();
-    let parsed = NvsPartition::parse_partition(&bin).unwrap();
+    let parsed = NvsPartition::try_from_bytes(bin).unwrap();
     assert_eq!(parsed.entries.len(), 64);
 
     // Verify primitive cycling pattern [i8, u8, i16, u16, i32, u32] for
@@ -220,17 +221,14 @@ fn test_roundtrip_mixed() {
 fn test_validation_errors() {
     // Non-4096-aligned partition size
     let partition = NvsPartition { entries: vec![] };
-    let bin_file = NamedTempFile::new().unwrap();
     assert!(
-        partition
-            .generate_partition_file(bin_file.path(), 5000)
-            .is_err(),
+        partition.generate_partition(5000).is_err(),
         "non-4096-aligned size should be rejected"
     );
 
     // Binary data whose length isn't a multiple of 4096
     let bad_data = vec![0xFF; 1000];
-    assert!(NvsPartition::parse_partition(&bad_data).is_err());
+    assert!(NvsPartition::try_from_bytes(bad_data).is_err());
 
     // Too many namespaces (256 > 255 limit)
     let mut partition = NvsPartition { entries: vec![] };

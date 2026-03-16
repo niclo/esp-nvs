@@ -1,14 +1,16 @@
+use std::fs;
+
 use esp_nvs_partition_tool::{
     DataValue,
     EntryContent,
     NvsPartition,
 };
 
+mod common;
+
 #[test]
 fn test_hex2bin_encoding() {
-    let csv_path = "tests/assets/hex2bin_test.csv";
-
-    let partition = NvsPartition::from_csv_file(csv_path).unwrap();
+    let partition = common::read_csv_file("tests/assets/hex2bin_test.csv");
     assert_eq!(partition.entries.len(), 1);
 
     match &partition.entries[0].content {
@@ -24,8 +26,8 @@ fn test_hex2bin_encoding() {
 
 #[test]
 fn test_key_length_validation() {
-    let csv_path = "tests/assets/invalid_long_key.csv";
+    let content = fs::read_to_string("tests/assets/invalid_long_key.csv").unwrap();
 
-    let result = NvsPartition::from_csv_file(csv_path);
+    let result = NvsPartition::try_from_str(&content);
     assert!(result.is_err());
 }

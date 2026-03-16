@@ -1,10 +1,14 @@
+use std::fs;
 use std::path::PathBuf;
 
 use clap::{
     Parser,
     Subcommand,
 };
-use esp_nvs_partition_tool::NvsPartition;
+use esp_nvs_partition_tool::{
+    EntryContent,
+    NvsPartition,
+};
 
 #[derive(Parser)]
 #[command(name = "esp-nvs-partition-tool")]
@@ -56,11 +60,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             size,
         } => {
             println!("Parsing CSV file: {}", input.display());
-            let partition = NvsPartition::from_csv_file(&input)?;
+            let content = fs::read_to_string(&input)?;
+            let mut partition = NvsPartition::try_from_str(&content)?;
+
+            // Resolve relative file paths against the CSV file's parent
+            // directory.
+            if let Some(base) = input.parent() {
+                for entry in &mut partition.entries {
+                    if let EntryContent::File { file_path, .. } = &mut entry.content {
+                        if file_path.is_relative() {
+                            *file_path = base.join(&file_path);
+                        }
+                    }
+                }
+            }
+
             println!("Found {} entries", partition.entries.len());
 
             println!("Generating partition binary...");
-            partition.generate_partition_file(&output, size)?;
+            let data = partition.generate_partition(size)?;
+            fs::write(&output, &data)?;
 
             println!("Successfully generated NVS partition: {}", output.display());
             println!(
@@ -73,11 +92,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Parse { input, output } => {
             println!("Parsing binary file: {}", input.display());
-            let partition = NvsPartition::parse_partition_file(&input)?;
+            let data = fs::read(&input)?;
+            let partition = NvsPartition::try_from_bytes(data)?;
             println!("Found {} entries", partition.entries.len());
 
             println!("Writing CSV file...");
-            partition.to_csv_file(&output)?;
+            let csv_content = partition.to_csv()?;
+            fs::write(&output, &csv_content)?;
 
             println!("Successfully parsed NVS partition to: {}", output.display());
 

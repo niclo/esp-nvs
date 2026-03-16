@@ -1,28 +1,20 @@
-use std::fs;
-
 use esp_nvs_partition_tool::{
     DataValue,
     NvsEntry,
     NvsPartition,
 };
-use tempfile::NamedTempFile;
+
+mod common;
 
 #[test]
 fn test_csv_to_binary() {
-    let csv_path = "tests/assets/roundtrip_basic.csv";
-
-    let partition = NvsPartition::from_csv_file(csv_path).unwrap();
+    let partition = common::read_csv_file("tests/assets/roundtrip_basic.csv");
     assert_eq!(partition.entries.len(), 3);
     assert_eq!(partition.entries[0].namespace, "storage");
     assert_eq!(partition.entries[0].key, "int32_test");
 
-    let bin_file = NamedTempFile::new().unwrap();
-    partition
-        .generate_partition_file(bin_file.path(), 16384)
-        .unwrap();
-
-    let metadata = fs::metadata(bin_file.path()).unwrap();
-    assert_eq!(metadata.len(), 16384);
+    let data = partition.generate_partition(16384).unwrap();
+    assert_eq!(data.len(), 16384);
 }
 
 #[test]
@@ -45,34 +37,24 @@ fn test_generate_from_api() {
         DataValue::String("Test Device".to_string()),
     ));
 
-    let bin_file = NamedTempFile::new().unwrap();
-    let result = partition.generate_partition_file(bin_file.path(), 8192);
-    assert!(result.is_ok());
-
-    let metadata = fs::metadata(bin_file.path()).unwrap();
-    assert_eq!(metadata.len(), 8192);
+    let data = partition.generate_partition(8192).unwrap();
+    assert_eq!(data.len(), 8192);
 }
 
 #[test]
 fn test_multiple_namespaces() {
-    let csv_path = "tests/assets/multiple_namespaces.csv";
-
-    let partition = NvsPartition::from_csv_file(csv_path).unwrap();
+    let partition = common::read_csv_file("tests/assets/multiple_namespaces.csv");
     assert_eq!(partition.entries.len(), 64);
 
-    let bin_file = NamedTempFile::new().unwrap();
-    let result = partition.generate_partition_file(bin_file.path(), 0x6000);
+    let result = partition.generate_partition(0x6000);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_large_string() {
-    let csv_path = "tests/assets/large_string.csv";
+    let partition = common::read_csv_file("tests/assets/large_string.csv");
 
-    let partition = NvsPartition::from_csv_file(csv_path).unwrap();
-
-    let bin_file = NamedTempFile::new().unwrap();
-    let result = partition.generate_partition_file(bin_file.path(), 0x5000);
+    let result = partition.generate_partition(0x5000);
     assert!(result.is_ok());
 }
 
@@ -85,8 +67,6 @@ fn test_invalid_partition_size() {
         DataValue::U8(0),
     ));
 
-    let bin_file = NamedTempFile::new().unwrap();
-
-    let result = partition.generate_partition_file(bin_file.path(), 1024);
+    let result = partition.generate_partition(1024);
     assert!(result.is_err());
 }

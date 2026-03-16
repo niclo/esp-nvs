@@ -1,6 +1,3 @@
-use std::fs;
-use std::path::Path;
-
 use esp_nvs::mem_flash::MemFlash;
 use esp_nvs::{
     ItemType,
@@ -14,12 +11,6 @@ use super::{
 };
 use crate::NvsPartition;
 use crate::error::Error;
-
-/// Parse an NVS partition binary file at the given `path`.
-pub(crate) fn parse_binary<P: AsRef<Path>>(path: P) -> Result<NvsPartition, Error> {
-    let data = fs::read(path)?;
-    parse_binary_data(&data)
-}
 
 /// Parse an NVS partition binary from an in-memory byte slice.
 pub(crate) fn parse_binary_data(data: &[u8]) -> Result<NvsPartition, Error> {
