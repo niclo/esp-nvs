@@ -2,7 +2,11 @@
 
 // filename according to https://doc.rust-lang.org/book/ch11-03-test-organization.html
 use embedded_storage::nor_flash::{
-    ErrorType, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
+    ErrorType,
+    NorFlash,
+    NorFlashError,
+    NorFlashErrorKind,
+    ReadNorFlash,
 };
 
 pub const FLASH_SECTOR_SIZE: usize = 4096;
@@ -136,10 +140,7 @@ impl NorFlash for Flash {
         assert!(from.is_multiple_of(Self::ERASE_SIZE as _));
         assert!(to.is_multiple_of(Self::ERASE_SIZE as _));
 
-        println!(
-            "    flash: erase: {from:04X} - {to:04X} #{:>2}",
-            self.operations.len()
-        );
+        println!("    flash: erase: {from:04X} - {to:04X} #{:>2}", self.operations.len());
 
         if self.operations.len() >= self.fail_after_operation {
             println!("    flash: FAULT");
@@ -184,7 +185,8 @@ impl NorFlash for Flash {
         let offset = offset as usize;
         for (i, &val) in bytes.iter().enumerate() {
             // the esp flash we can only flip bits from 1 to 0
-            // println!("0x[{:04x}] {} &= {val} = {}",  offset+i,self.buf[offset + i], self.buf[offset + i] & val);
+            // println!("0x[{:04x}] {} &= {val} = {}",  offset+i,self.buf[offset + i],
+            // self.buf[offset + i] & val);
             self.buf[offset + i] &= val;
         }
         Ok(())
@@ -194,8 +196,6 @@ impl NorFlash for Flash {
 impl esp_nvs::platform::Crc for Flash {
     fn crc32(init: u32, data: &[u8]) -> u32 {
         // Cast to c_ulong here, because on windows this is a u32, and on linux it is a u64
-        unsafe {
-            libz_sys::crc32(init as core::ffi::c_ulong, data.as_ptr(), data.len() as u32) as u32
-        }
+        unsafe { libz_sys::crc32(init as core::ffi::c_ulong, data.as_ptr(), data.len() as u32) as u32 }
     }
 }
